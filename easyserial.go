@@ -2,21 +2,36 @@ package easyserial
 
 import (
 	"encoding/json"
+	"flag"
 	"github.com/jiguorui/crc16"
+	"github.com/sigurn/crc8"
 	"github.com/tarm/serial"
+	"io"
+	"net"
 	"time"
 )
 
 var SerialConfig serial.Config
+
+var TcpToSerialIPAndPort = ""
 
 func init() {
 	SerialConfig.Name = "/dev/ttyS0"
 	SerialConfig.Baud = 9600
 	SerialConfig.ReadTimeout = time.Millisecond * 500
 
+	flag.StringVar(&TcpToSerialIPAndPort, "tcp", "", "")
 }
+
 func SendCrc16CheckSum(sendRaw []byte, planLen int) ([]byte, error) {
 	return send(sendRaw, crc16CheckSum, planLen)
+}
+
+func SendCrc8CheckSum(sendRaw []byte, planLen int) ([]byte, error) {
+	return send(sendRaw, crc8CheckSum, planLen)
+}
+func SendNoneCheckSum(sendRaw []byte, planLen int) ([]byte, error) {
+	return send(sendRaw, noneCheckSum, planLen)
 }
 
 func SendBccCheckSum(sendRaw []byte, planLen int) ([]byte, error) {
@@ -24,18 +39,26 @@ func SendBccCheckSum(sendRaw []byte, planLen int) ([]byte, error) {
 }
 
 func send(sendRaw []byte, checkSum func(instruction []byte, isAppend bool) []byte, planLen int) ([]byte, error) {
-	c := &SerialConfig
-	s, err := serial.OpenPort(c)
-	if err != nil {
-		return nil, err
+	var s io.ReadWriteCloser
+	var err error
+	if TcpToSerialIPAndPort != "" {
+		s, err = net.Dial("tcp", TcpToSerialIPAndPort)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		s, err = serial.OpenPort(&SerialConfig)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	defer func() {
 		s.Close()
 	}()
 	data := checkSum(sendRaw, true)
+	//log.Printf("%x", data)
 	_, err = s.Write(data)
-
-	//log.Printf("%x",data)
 
 	if err != nil {
 		return nil, err
@@ -62,6 +85,10 @@ func send(sendRaw []byte, checkSum func(instruction []byte, isAppend bool) []byt
 	return bufAll, err
 }
 
+func noneCheckSum(instruction []byte, isAppend bool) []byte {
+	return instruction
+}
+
 func crc16CheckSum(instruction []byte, isAppend bool) []byte {
 
 	if isAppend {
@@ -71,6 +98,18 @@ func crc16CheckSum(instruction []byte, isAppend bool) []byte {
 	instruction[len(instruction)-2], instruction[len(instruction)-1] = uint16ToBytes(crc16.CheckSum(instruction[:len(instruction)-2]))
 	return instruction
 }
+
+func crc8CheckSum(instruction []byte, isAppend bool) []byte {
+
+	if isAppend {
+		instruction = append(instruction, []byte{0}...)
+	}
+
+	table := crc8.MakeTable(crc8.CRC8)
+	instruction[len(instruction)-1] = crc8.Checksum(instruction[:len(instruction)-1], table)
+	return instruction
+}
+
 func bccCheckSum(instruction []byte, isAppend bool) []byte {
 
 	if isAppend {
