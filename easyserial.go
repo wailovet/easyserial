@@ -38,6 +38,8 @@ func SendBccCheckSum(sendRaw []byte, planLen int) ([]byte, error) {
 	return send(sendRaw, bccCheckSum, planLen)
 }
 
+var EofRemaining = 3
+
 func send(sendRaw []byte, checkSum func(instruction []byte, isAppend bool) []byte, planLen int) ([]byte, error) {
 	var s io.ReadWriteCloser
 	var err error
@@ -82,6 +84,13 @@ func send(sendRaw []byte, checkSum func(instruction []byte, isAppend bool) []byt
 		if len(bufAll) >= planLen {
 			break
 		}
+	}
+
+	if err == io.EOF && EofRemaining > 0 {
+		EofRemaining--
+		time.Sleep(time.Second)
+		//log.Println("EOF:",EofRemaining)
+		bufAll, err = send(sendRaw, checkSum, planLen)
 	}
 	return bufAll, err
 }
