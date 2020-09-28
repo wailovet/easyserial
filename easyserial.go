@@ -71,8 +71,9 @@ func send(sendRaw []byte, checkSum func(instruction []byte, isAppend bool) []byt
 	var bufAll []byte
 	err = nil
 	for {
+		var n int
 		buf := make([]byte, 128)
-		n, err := s.Read(buf)
+		n, err = s.Read(buf)
 		if err != nil {
 			break
 		}
