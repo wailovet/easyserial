@@ -142,3 +142,16 @@ func DisplayToString(r interface{}) string {
 	result, _ := json.Marshal(r)
 	return string(result)
 }
+
+func ByteToNum(b ...byte) int {
+	bl := len(b)
+	if bl < 1 {
+		return 0
+	}
+	if bl == 1 {
+		return int(b[0])
+	}
+
+	return ByteToNum(b[0:bl-1]...)*0xFF + int(b[bl-1])
+
+}
