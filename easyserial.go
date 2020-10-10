@@ -3,11 +3,13 @@ package easyserial
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"github.com/jiguorui/crc16"
 	"github.com/sigurn/crc8"
 	"github.com/tarm/serial"
 	"io"
 	"net"
+	"os"
 	"time"
 )
 
@@ -109,6 +111,12 @@ func crc16CheckSum(instruction []byte, isAppend bool) []byte {
 	return instruction
 }
 
+func CheckCrc16CheckSum(data []byte) bool {
+	l := len(data)
+	a, b := uint16ToBytes(crc16.CheckSum(data[:l-2]))
+	return a == data[l-2] && b == data[l-1]
+}
+
 func crc8CheckSum(instruction []byte, isAppend bool) []byte {
 
 	if isAppend {
@@ -118,6 +126,13 @@ func crc8CheckSum(instruction []byte, isAppend bool) []byte {
 	table := crc8.MakeTable(crc8.CRC8)
 	instruction[len(instruction)-1] = crc8.Checksum(instruction[:len(instruction)-1], table)
 	return instruction
+}
+
+func CheckCrc8CheckSum(data []byte) bool {
+	l := len(data)
+	table := crc8.MakeTable(crc8.CRC8)
+	c := crc8.Checksum(data[:l-1], table)
+	return c == data[l-1]
 }
 
 func bccCheckSum(instruction []byte, isAppend bool) []byte {
@@ -154,4 +169,34 @@ func ByteToNum(b ...byte) int {
 
 	return ByteToNum(b[0:bl-1]...)*0xFF + int(b[bl-1])
 
+}
+
+func CheckTimeOut() {
+	go func() {
+		time.Sleep(time.Second * 10)
+		fmt.Println(DisplayToString("timeout"))
+		os.Exit(0)
+	}()
+}
+
+func CheckDeviceBusy(isWait bool) func() {
+	tcp, merr := net.Listen("tcp", "127.0.0.1:53485")
+	if isWait {
+		for merr != nil {
+			time.Sleep(time.Second)
+			tcp, merr = net.Listen("tcp", "127.0.0.1:53485")
+		}
+	} else {
+		if merr != nil {
+			DeviceBusy()
+		}
+	}
+	return func() {
+		tcp.Close()
+	}
+}
+
+func DeviceBusy() {
+	fmt.Println(DisplayToString("busy"))
+	os.Exit(0)
 }
