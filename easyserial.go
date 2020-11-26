@@ -17,12 +17,16 @@ var SerialConfig serial.Config
 
 var TcpToSerialIPAndPort = ""
 
+var debug bool
+
 func init() {
 	SerialConfig.Name = "/dev/ttyS0"
 	SerialConfig.Baud = 9600
 	SerialConfig.ReadTimeout = time.Millisecond * 500
 
 	flag.StringVar(&TcpToSerialIPAndPort, "tcp", "", "")
+
+	flag.BoolVar(&debug, "debug", false, "")
 }
 
 func SendCrc16CheckSum(sendRaw []byte, planLen int) ([]byte, error) {
@@ -65,7 +69,9 @@ func send(sendRaw []byte, checkSum func(instruction []byte, isAppend bool) []byt
 		s.Close()
 	}()
 	data := checkSum(sendRaw, true)
-	//log.Printf("%# x",data)
+
+	DebugLog("Write data:%# x\n", data)
+
 	_, err = s.Write(data)
 
 	if err != nil {
@@ -82,22 +88,27 @@ func send(sendRaw []byte, checkSum func(instruction []byte, isAppend bool) []byt
 		var n int
 		buf := make([]byte, 128)
 		n, err = s.Read(buf)
-		if err != nil {
+		if err != nil && err != io.EOF {
 			break
 		}
 		bufAll = append(bufAll, buf[:n]...)
 
 		if len(bufAll) >= planLen {
+			if err == io.EOF {
+				err = nil
+			}
 			break
 		}
 	}
 
-	if err == io.EOF && EofRemaining > 0 {
-		EofRemaining--
-		time.Sleep(time.Second)
-		//log.Println("EOF:",EofRemaining)
-		bufAll, err = send(sendRaw, checkSum, planLen)
-	}
+	//if err == io.EOF && EofRemaining > 0 {
+	//	EofRemaining--
+	//	time.Sleep(time.Second)
+	//	//log.Println("EOF:",EofRemaining)
+	//	bufAll, err = send(sendRaw, checkSum, planLen)
+	//}
+
+	DebugLog("Read data:%# x\n", bufAll)
 	return bufAll, err
 }
 
@@ -260,7 +271,13 @@ func CrcCcitt(data []byte) (crc uint16) {
 	}
 
 	//log.Printf("%# x", bs)
-	//log.Printf("%# x", ^crc)
 	crc = ^crc
+	//log.Printf("%# x", crc)
 	return
+}
+
+func DebugLog(s string, v ...interface{}) {
+	if debug {
+		fmt.Printf(s, v)
+	}
 }
