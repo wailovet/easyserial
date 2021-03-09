@@ -50,7 +50,14 @@ func SendBccCheckSum(sendRaw []byte, planLen int) ([]byte, error) {
 
 var EofRemaining = 3
 
+var SendHook func(sendRaw []byte, planLen int) ([]byte, error)
+
 func send(sendRaw []byte, checkSum func(instruction []byte, isAppend bool) []byte, planLen int) ([]byte, error) {
+	if SendHook != nil {
+		data := checkSum(sendRaw, true)
+		return SendHook(data, planLen)
+	}
+
 	var s io.ReadWriteCloser
 	var err error
 	if TcpToSerialIPAndPort != "" {
