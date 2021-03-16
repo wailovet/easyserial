@@ -50,12 +50,16 @@ func SendBccCheckSum(sendRaw []byte, planLen int) ([]byte, error) {
 
 var EofRemaining = 3
 
-var SendHook func(sendRaw []byte, planLen int) ([]byte, error)
+var SendHook func(sendRaw []byte, planLen int, ext map[string]string) ([]byte, error)
 
-func send(sendRaw []byte, checkSum func(instruction []byte, isAppend bool) []byte, planLen int) ([]byte, error) {
+func send(sendRaw []byte, checkSum func(instruction []byte, isAppend bool) []byte, planLen int, exts ...map[string]string) ([]byte, error) {
 	if SendHook != nil {
 		data := checkSum(sendRaw, true)
-		return SendHook(data, planLen)
+		ext := map[string]string{}
+		if len(exts) > 0 {
+			ext = exts[0]
+		}
+		return SendHook(data, planLen, ext)
 	}
 
 	var s io.ReadWriteCloser
