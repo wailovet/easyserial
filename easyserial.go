@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/jiguorui/crc16"
-	"github.com/sigurn/crc8"
-	"github.com/tarm/serial"
 	"io"
 	"net"
 	"os"
 	"time"
+
+	"github.com/jiguorui/crc16"
+	"github.com/sigurn/crc8"
+	"github.com/tarm/serial"
 )
 
 var SerialConfig serial.Config
@@ -40,6 +41,10 @@ func SendCrcCcittCheckSum(sendRaw []byte, planLen int) ([]byte, error) {
 func SendCrc8CheckSum(sendRaw []byte, planLen int) ([]byte, error) {
 	return send(sendRaw, crc8CheckSum, planLen)
 }
+
+func SendAccumulateCheckSum(sendRaw []byte, planLen int) ([]byte, error) {
+	return send(sendRaw, accumulateCheckSum, planLen)
+}
 func SendNoneCheckSum(sendRaw []byte, planLen int) ([]byte, error) {
 	return send(sendRaw, noneCheckSum, planLen)
 }
@@ -50,16 +55,12 @@ func SendBccCheckSum(sendRaw []byte, planLen int) ([]byte, error) {
 
 var EofRemaining = 3
 
-var SendHook func(sendRaw []byte, planLen int, ext map[string]string) ([]byte, error)
+var SendHook func(sendRaw []byte, planLen int) ([]byte, error)
 
-func send(sendRaw []byte, checkSum func(instruction []byte, isAppend bool) []byte, planLen int, exts ...map[string]string) ([]byte, error) {
+func send(sendRaw []byte, checkSum func(instruction []byte, isAppend bool) []byte, planLen int) ([]byte, error) {
 	if SendHook != nil {
 		data := checkSum(sendRaw, true)
-		ext := map[string]string{}
-		if len(exts) > 0 {
-			ext = exts[0]
-		}
-		return SendHook(data, planLen, ext)
+		return SendHook(data, planLen)
 	}
 
 	var s io.ReadWriteCloser
@@ -161,6 +162,21 @@ func crc8CheckSum(instruction []byte, isAppend bool) []byte {
 
 	table := crc8.MakeTable(crc8.CRC8)
 	instruction[len(instruction)-1] = crc8.Checksum(instruction[:len(instruction)-1], table)
+	return instruction
+}
+
+func accumulateCheckSum(instruction []byte, isAppend bool) []byte {
+
+	if isAppend {
+		instruction = append(instruction, []byte{0}...)
+	}
+
+	var c uint8
+	for _, v := range instruction {
+		c += v
+	}
+
+	instruction[len(instruction)-1] = c
 	return instruction
 }
 
