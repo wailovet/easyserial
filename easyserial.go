@@ -100,6 +100,9 @@ func send(sendRaw []byte, checkSum func(instruction []byte, isAppend bool) []byt
 		var n int
 		buf := make([]byte, 128)
 		n, err = s.Read(buf)
+
+		DebugLog("==> Read bytes:%# x\n", buf, n, err)
+
 		if err != nil && err != io.EOF {
 			break
 		}
